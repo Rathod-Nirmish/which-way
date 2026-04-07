@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { Difficulty, TOTAL_ROUNDS } from '../types/game'
+import { Difficulty } from '../types/game'
 
 interface GameOverProps {
   score: number
+  totalRounds: number
   bestStreak: number
   difficulty: Difficulty
   isHighScore: boolean
@@ -11,12 +12,13 @@ interface GameOverProps {
 
 export function GameOver({
   score,
+  totalRounds,
   bestStreak,
   difficulty,
   isHighScore,
   onPlayAgain,
 }: GameOverProps) {
-  const percent = score / TOTAL_ROUNDS
+  const percent = score / totalRounds
   const grade =
     percent === 1
       ? { emoji: '🏆', text: 'Perfect!' }
@@ -37,7 +39,7 @@ export function GameOver({
         <div className="space-y-1">
           <div className="text-7xl animate-bounce">{grade.emoji}</div>
           <h2 className="text-3xl font-black">{grade.text}</h2>
-          <p className="text-gray-500 text-sm">{diffLabel} mode · {TOTAL_ROUNDS} rounds</p>
+          <p className="text-gray-500 text-sm">{diffLabel} mode · {totalRounds} rounds</p>
         </div>
 
         <div className="bg-gray-900 rounded-2xl p-6 space-y-5 border border-gray-800">
@@ -45,7 +47,7 @@ export function GameOver({
           <div>
             <div className="text-6xl font-black">
               {score}
-              <span className="text-2xl text-gray-500">/{TOTAL_ROUNDS}</span>
+              <span className="text-2xl text-gray-500">/{totalRounds}</span>
             </div>
             <p className="text-gray-400 text-sm mt-1">correct</p>
           </div>

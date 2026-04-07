@@ -10,14 +10,16 @@ export interface GameState {
   bestStreak: number
   timeLeft: number
   lastCorrect: boolean | null
+  paused: boolean
 }
 
 export type GameAction =
   | { type: 'ANSWER'; correct: boolean }
   | { type: 'TIMEOUT' }
-  | { type: 'NEXT'; maxTime: number }
+  | { type: 'NEXT'; maxTime: number; totalRounds: number }
   | { type: 'TICK' }
-  | { type: 'RESET'; maxTime: number }
+  | { type: 'RESET'; maxTime: number; totalRounds?: number }
+  | { type: 'TOGGLE_PAUSE' }
 
 export function pickDirection(): Direction {
   return Math.random() < 0.5 ? 'left' : 'right'
@@ -33,6 +35,7 @@ export function initState(maxTime: number): GameState {
     bestStreak: 0,
     timeLeft: maxTime,
     lastCorrect: null,
+    paused: false,
   }
 }
 
@@ -47,6 +50,7 @@ export function reducer(state: GameState, action: GameAction): GameState {
         streak: newStreak,
         bestStreak: Math.max(state.bestStreak, newStreak),
         lastCorrect: action.correct,
+        paused: false,
       }
     }
     case 'TIMEOUT': {
@@ -55,10 +59,12 @@ export function reducer(state: GameState, action: GameAction): GameState {
         phase: 'feedback',
         streak: 0,
         lastCorrect: false,
+        paused: false,
       }
     }
     case 'NEXT': {
-      if (state.round >= TOTAL_ROUNDS) {
+      const totalRounds = action.totalRounds ?? TOTAL_ROUNDS
+      if (state.round >= totalRounds) {
         return { ...state, phase: 'done' }
       }
       return {
@@ -68,6 +74,7 @@ export function reducer(state: GameState, action: GameAction): GameState {
         round: state.round + 1,
         timeLeft: action.maxTime,
         lastCorrect: null,
+        paused: false,
       }
     }
     case 'TICK': {
@@ -75,6 +82,11 @@ export function reducer(state: GameState, action: GameAction): GameState {
     }
     case 'RESET': {
       return initState(action.maxTime)
+    }
+    case 'TOGGLE_PAUSE': {
+      // Only allow pause during the asking phase
+      if (state.phase !== 'asking') return state
+      return { ...state, paused: !state.paused }
     }
   }
 }

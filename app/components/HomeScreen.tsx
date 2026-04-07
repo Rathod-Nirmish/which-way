@@ -38,8 +38,11 @@ const DIFFICULTIES: { key: Difficulty; label: string; icon: string; desc: string
   },
 ]
 
+const ROUND_OPTIONS = [5, 10, 20]
+
 export default function HomeScreen() {
   const [scores, setScores] = useState<Record<Difficulty, number>>({ easy: 0, medium: 0, hard: 0 })
+  const [selectedRounds, setSelectedRounds] = useState(10)
 
   useEffect(() => {
     try {
@@ -61,12 +64,32 @@ export default function HomeScreen() {
           <p className="text-gray-400 text-lg">Master left &amp; right — once and for all!</p>
         </div>
 
+        {/* Round count picker */}
+        <div className="flex items-center justify-between bg-gray-900 rounded-2xl px-5 py-4 border border-gray-800">
+          <span className="text-sm text-gray-400 font-medium">Rounds</span>
+          <div className="flex gap-2">
+            {ROUND_OPTIONS.map((n) => (
+              <button
+                key={n}
+                onClick={() => setSelectedRounds(n)}
+                className={`w-12 py-1.5 rounded-xl text-sm font-bold transition-all ${
+                  selectedRounds === n
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Difficulty cards */}
         <div className="space-y-3">
           {DIFFICULTIES.map((d) => (
             <Link
               key={d.key}
-              href={`/game?difficulty=${d.key}`}
+              href={`/game?difficulty=${d.key}&rounds=${selectedRounds}`}
               className={`flex items-center justify-between rounded-2xl border-2 ${d.border} ${d.glow} bg-gray-900 p-5 shadow-lg hover:shadow-xl hover:scale-[1.025] active:scale-[0.975] transition-all duration-150`}
             >
               <div className="flex items-center gap-4">

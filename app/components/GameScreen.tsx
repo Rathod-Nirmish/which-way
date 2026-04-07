@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 import { Difficulty, Direction, MAX_TIME, TOTAL_ROUNDS } from '../types/game'
 import { useGameReducer } from '../hooks/useGameReducer'
+import { useMotivationalSpeech } from '../hooks/useMotivationalSpeech'
 import { EasyVisual, MediumVisual, HardVisual } from './VisualCues'
 import { FeedbackDisplay } from './FeedbackDisplay'
 import { GameOver } from './GameOver'
@@ -13,36 +14,48 @@ import { GameOver } from './GameOver'
 export default function GameScreen() {
   const params = useSearchParams()
   const difficulty = (params.get('difficulty') ?? 'easy') as Difficulty
+  const totalRounds = Math.max(1, parseInt(params.get('rounds') ?? String(TOTAL_ROUNDS), 10))
   const maxTime = MAX_TIME[difficulty]
   const hasTimer = difficulty !== 'easy'
 
   const [state, dispatch] = useGameReducer(maxTime)
-  const { phase, direction, round, score, streak, bestStreak, timeLeft, lastCorrect } = state
+  const speakMotivation = useMotivationalSpeech()
+  const { phase, direction, round, score, streak, bestStreak, timeLeft, lastCorrect, paused } = state
 
   const [timedOut, setTimedOut] = useState(false)
   const [isHighScore, setIsHighScore] = useState(false)
 
-  // Auto-advance after feedback
+  // Escape key → toggle pause
   useEffect(() => {
-    if (phase !== 'feedback') return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') dispatch({ type: 'TOGGLE_PAUSE' })
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [dispatch])
+
+  // Auto-advance after feedback (skip while paused)
+  useEffect(() => {
+    if (phase !== 'feedback' || paused) return
     const id = setTimeout(() => {
       setTimedOut(false)
-      dispatch({ type: 'NEXT', maxTime })
+      dispatch({ type: 'NEXT', maxTime, totalRounds })
     }, 1200)
     return () => clearTimeout(id)
-  }, [phase, maxTime, dispatch])
+  }, [phase, paused, maxTime, totalRounds, dispatch])
 
-  // Countdown timer (medium / hard)
+  // Countdown timer (medium / hard) — frozen while paused
   useEffect(() => {
-    if (!hasTimer || phase !== 'asking') return
+    if (!hasTimer || phase !== 'asking' || paused) return
     if (timeLeft <= 0) {
       setTimedOut(true)
+      speakMotivation()
       dispatch({ type: 'TIMEOUT' })
       return
     }
     const id = setTimeout(() => dispatch({ type: 'TICK' }), 1000)
     return () => clearTimeout(id)
-  }, [timeLeft, phase, hasTimer, dispatch])
+  }, [timeLeft, phase, hasTimer, paused, dispatch, speakMotivation])
 
   // Persist high score on game completion
   useEffect(() => {
@@ -63,8 +76,10 @@ export default function GameScreen() {
   }, [phase, score, difficulty])
 
   function handleAnswer(chosen: Direction) {
-    if (phase !== 'asking') return
-    dispatch({ type: 'ANSWER', correct: chosen === direction })
+    if (phase !== 'asking' || paused) return
+    const correct = chosen === direction
+    if (!correct) speakMotivation()
+    dispatch({ type: 'ANSWER', correct })
   }
 
   function handlePlayAgain() {
@@ -77,6 +92,7 @@ export default function GameScreen() {
     return (
       <GameOver
         score={score}
+        totalRounds={totalRounds}
         bestStreak={bestStreak}
         difficulty={difficulty}
         isHighScore={isHighScore}
@@ -103,7 +119,7 @@ export default function GameScreen() {
       : ''
 
   return (
-    <div className={`min-h-screen bg-gray-950 text-white flex flex-col ${bgClass}`}>
+    <div className={`relative min-h-screen bg-gray-950 text-white flex flex-col ${bgClass}`}>
 
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-4 shrink-0">
@@ -112,7 +128,7 @@ export default function GameScreen() {
         </Link>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-500">
-            Round <span className="text-white font-bold">{round}</span>/{TOTAL_ROUNDS}
+            Round <span className="text-white font-bold">{round}</span>/{totalRounds}
           </span>
           <span className="text-yellow-400 font-bold">Score: {score}</span>
           {streak >= 2 && (
@@ -136,7 +152,7 @@ export default function GameScreen() {
 
       {/* Round progress dots */}
       <div className="flex justify-center gap-1.5 py-4 shrink-0">
-        {Array.from({ length: TOTAL_ROUNDS }, (_, i) => (
+        {Array.from({ length: totalRounds }, (_, i) => (
           <div
             key={i}
             className={`rounded-full transition-all duration-300 ${
@@ -172,19 +188,31 @@ export default function GameScreen() {
       <div className="flex gap-4 p-5 shrink-0">
         <button
           onClick={() => handleAnswer('left')}
-          disabled={phase !== 'asking'}
+          disabled={phase !== 'asking' || paused}
           className="flex-1 py-6 rounded-2xl bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-xl font-black tracking-tight transition-all shadow-lg"
         >
           ← LEFT
         </button>
         <button
           onClick={() => handleAnswer('right')}
-          disabled={phase !== 'asking'}
+          disabled={phase !== 'asking' || paused}
           className="flex-1 py-6 rounded-2xl bg-violet-600 hover:bg-violet-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-xl font-black tracking-tight transition-all shadow-lg"
         >
           RIGHT →
         </button>
       </div>
+
+      {/* Pause overlay */}
+      {paused && (
+        <div
+          className="absolute inset-0 bg-gray-950/90 backdrop-blur-sm flex flex-col items-center justify-center gap-5 z-50"
+          onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })}
+        >
+          <div className="text-6xl">⏸</div>
+          <h2 className="text-3xl font-black tracking-tight">Paused</h2>
+          <p className="text-gray-400 text-sm">Press <kbd className="bg-gray-800 text-white px-2 py-0.5 rounded text-xs font-mono">Esc</kbd> or tap to resume</p>
+        </div>
+      )}
 
     </div>
   )
